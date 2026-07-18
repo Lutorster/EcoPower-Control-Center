@@ -1,4 +1,4 @@
-# EcoPower Control Center v3.0
+# EcoPower Control Center v2.1
 
 Target: Waveshare/Sunton ESP32-S3 7-inch RGB LCD, 800x480, GT911, ESP-IDF 5.4.4.
 

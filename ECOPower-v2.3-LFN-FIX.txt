@@ -1,0 +1,13 @@
+EcoPower v2.3 - FATFS Long Filename Fix
+
+Changes:
+- FATFS long filename support enabled on heap.
+- Maximum long filename length set to 255.
+- Settings added to both sdkconfig and sdkconfig.defaults.
+- CH422G is prepared only before SD mounting, not before every fopen().
+- Asset path remains /sdcard/assets/dashboard.png.
+
+Build:
+idf.py fullclean
+idf.py build
+idf.py flash monitor

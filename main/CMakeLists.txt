@@ -7,6 +7,7 @@ idf_component_register(
         "ui/assets.cpp"
         "ui/theme.cpp"
         "ui/dashboard.cpp"
+        "ui/inverter_page.cpp"
         "ui/startup.cpp"
         "ui/widgets/value_label.cpp"
         "ui/widgets/flow_dot.cpp"

@@ -115,3 +115,37 @@ menu "Example Configuration"
                 Height of LVGL buffer. The width of the buffer is the same as that of the LCD.
     endmenu
 endmenu
+
+menu "EcoPower OS"
+    menu "Deye RS485 diagnostics"
+        config ECOPOWER_DEYE_BAUD_RATE
+            int "Baud rate"
+            default 9600
+            range 1200 115200
+
+        config ECOPOWER_DEYE_SLAVE_ADDRESS
+            int "Modbus slave address"
+            default 1
+            range 1 247
+
+        config ECOPOWER_DEYE_POLL_INTERVAL_MS
+            int "Diagnostic poll interval (ms)"
+            default 2000
+            range 500 60000
+
+        config ECOPOWER_DEYE_PROBE_FUNCTION
+            int "Probe function code (3=holding, 4=input)"
+            default 3
+            range 3 4
+
+        config ECOPOWER_DEYE_PROBE_REGISTER
+            int "Probe start register"
+            default 0
+            range 0 65535
+
+        config ECOPOWER_DEYE_PROBE_COUNT
+            int "Probe register count"
+            default 1
+            range 1 16
+    endmenu
+endmenu
