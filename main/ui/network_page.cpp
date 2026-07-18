@@ -6,15 +6,23 @@
 #include "esp_log.h"
 
 #include <cstdio>
+#include <cstring>
 
 static const char *TAG = "EcoPower_Network";
+
 static lv_obj_t *g_screen = nullptr;
 static lv_obj_t *g_status_text = nullptr;
 static lv_obj_t *g_status_dot = nullptr;
 static lv_obj_t *g_network_list = nullptr;
+static lv_obj_t *g_selected_ssid_label = nullptr;
+static lv_obj_t *g_selected_signal_label = nullptr;
+static lv_obj_t *g_selected_security_label = nullptr;
 static lv_timer_t *g_refresh_timer = nullptr;
+
 static bool g_last_scanning = false;
-static bool g_results_shown = false;
+static char g_selected_ssid[33] = {};
+static int8_t g_selected_rssi = 0;
+static bool g_selected_secured = false;
 
 namespace {
 
@@ -35,13 +43,65 @@ void back_event_cb(lv_event_t *)
     ecopower_settings_page_show();
 }
 
+void update_selected_details()
+{
+    if (g_selected_ssid[0] == '\0') {
+        lv_label_set_text(g_selected_ssid_label, "Not selected");
+        lv_label_set_text(g_selected_signal_label, "-- dBm");
+        lv_label_set_text(g_selected_security_label, "---");
+        return;
+    }
+
+    lv_label_set_text(g_selected_ssid_label, g_selected_ssid);
+
+    char signal[20] = {};
+    std::snprintf(signal, sizeof(signal), "%d dBm",
+                  static_cast<int>(g_selected_rssi));
+    lv_label_set_text(g_selected_signal_label, signal);
+
+    lv_label_set_text(
+        g_selected_security_label,
+        g_selected_secured ? "Password required" : "Open network");
+}
+
+void set_selected_network(const EcoPowerWifiNetwork &network)
+{
+    std::snprintf(
+        g_selected_ssid,
+        sizeof(g_selected_ssid),
+        "%s",
+        network.ssid);
+
+    g_selected_rssi = network.rssi;
+    g_selected_secured = network.secured;
+
+    update_selected_details();
+
+    ESP_LOGI(
+        TAG,
+        "Selected network: SSID=%s RSSI=%d secured=%s",
+        g_selected_ssid,
+        static_cast<int>(g_selected_rssi),
+        g_selected_secured ? "yes" : "no");
+}
+
 void network_item_event_cb(lv_event_t *event)
 {
-    const char *ssid =
-        static_cast<const char *>(lv_event_get_user_data(event));
+    auto *network =
+        static_cast<EcoPowerWifiNetwork *>(lv_event_get_user_data(event));
 
-    if (ssid != nullptr) {
-        ESP_LOGI(TAG, "Network selected: %s", ssid);
+    if (network == nullptr) {
+        return;
+    }
+
+    set_selected_network(*network);
+}
+
+void network_item_delete_cb(lv_event_t *event)
+{
+    void *data = lv_event_get_user_data(event);
+    if (data != nullptr) {
+        lv_mem_free(data);
     }
 }
 
@@ -55,7 +115,7 @@ void clear_network_list()
 void show_scan_results()
 {
     EcoPowerWifiNetwork networks[12] = {};
-    const std::size_t count =
+    const size_t count =
         ecopower_wifi_manager_get_scan_results(networks, 12);
 
     clear_network_list();
@@ -70,7 +130,7 @@ void show_scan_results()
         return;
     }
 
-    for (std::size_t i = 0; i < count; ++i) {
+    for (size_t i = 0; i < count; ++i) {
         lv_obj_t *button = lv_btn_create(g_network_list);
         lv_obj_set_width(button, lv_pct(100));
         lv_obj_set_height(button, 44);
@@ -107,15 +167,24 @@ void show_scan_results()
             lv_color_hex(0x65C8FF));
         lv_obj_align(signal, LV_ALIGN_RIGHT_MID, -8, 0);
 
-        char *stored_ssid =
-            static_cast<char *>(lv_mem_alloc(33));
-        if (stored_ssid != nullptr) {
-            std::snprintf(stored_ssid, 33, "%s", networks[i].ssid);
+        auto *stored_network =
+            static_cast<EcoPowerWifiNetwork *>(
+                lv_mem_alloc(sizeof(EcoPowerWifiNetwork)));
+
+        if (stored_network != nullptr) {
+            *stored_network = networks[i];
+
             lv_obj_add_event_cb(
                 button,
                 network_item_event_cb,
                 LV_EVENT_CLICKED,
-                stored_ssid);
+                stored_network);
+
+            lv_obj_add_event_cb(
+                button,
+                network_item_delete_cb,
+                LV_EVENT_DELETE,
+                stored_network);
         }
     }
 }
@@ -128,14 +197,12 @@ void refresh_timer_cb(lv_timer_t *)
         lv_label_set_text(g_status_text, "Scanning...");
         lv_obj_set_style_bg_color(
             g_status_dot, lv_color_hex(0xFFD21C), 0);
-        g_results_shown = false;
     } else if (g_last_scanning &&
                ecopower_wifi_manager_scan_ready()) {
         lv_label_set_text(g_status_text, "Scan complete");
         lv_obj_set_style_bg_color(
             g_status_dot, lv_color_hex(0x20A8FF), 0);
         show_scan_results();
-        g_results_shown = true;
     }
 
     g_last_scanning = scanning;
@@ -149,6 +216,7 @@ void scan_event_cb(lv_event_t *)
         lv_label_set_text(g_status_text, "Starting scan...");
         lv_obj_set_style_bg_color(
             g_status_dot, lv_color_hex(0xFFD21C), 0);
+
         clear_network_list();
 
         lv_obj_t *progress = create_label(
@@ -163,19 +231,36 @@ void scan_event_cb(lv_event_t *)
         lv_label_set_text(g_status_text, "Scan failed");
         lv_obj_set_style_bg_color(
             g_status_dot, lv_color_hex(0xFF5C5C), 0);
-        ESP_LOGE(TAG, "Unable to start scan: %s",
-                 esp_err_to_name(error));
+
+        ESP_LOGE(
+            TAG,
+            "Unable to start scan: %s",
+            esp_err_to_name(error));
     }
 }
 
 void connect_event_cb(lv_event_t *)
 {
-    ESP_LOGI(TAG, "Connect will be enabled in the next stage");
+    if (g_selected_ssid[0] == '\0') {
+        lv_label_set_text(g_status_text, "Select a network first");
+        lv_obj_set_style_bg_color(
+            g_status_dot, lv_color_hex(0xFFD21C), 0);
+        return;
+    }
+
+    ESP_LOGI(
+        TAG,
+        "CONNECT pressed for SSID: %s",
+        g_selected_ssid);
+
+    lv_label_set_text(
+        g_status_text,
+        "Password input is next stage");
 }
 
 void disconnect_event_cb(lv_event_t *)
 {
-    ESP_LOGI(TAG, "Disconnect will be enabled in the next stage");
+    ESP_LOGI(TAG, "Disconnect will be enabled after connection stage");
 }
 
 lv_obj_t *create_action_button(lv_obj_t *parent,
@@ -220,7 +305,30 @@ lv_obj_t *create_card(lv_obj_t *parent,
     lv_obj_t *title_label = create_label(
         card, title, &lv_font_montserrat_14, lv_color_hex(0x8FAFC4));
     lv_obj_set_pos(title_label, 0, 0);
+
     return card;
+}
+
+void create_detail_row(lv_obj_t *parent,
+                       int y,
+                       const char *caption,
+                       lv_obj_t **value_label)
+{
+    lv_obj_t *caption_label = create_label(
+        parent,
+        caption,
+        &lv_font_montserrat_12,
+        lv_color_hex(0x8FAFC4));
+    lv_obj_set_pos(caption_label, 0, y);
+
+    *value_label = create_label(
+        parent,
+        "---",
+        &lv_font_montserrat_14,
+        lv_color_white());
+    lv_obj_set_pos(*value_label, 0, y + 18);
+    lv_label_set_long_mode(*value_label, LV_LABEL_LONG_DOT);
+    lv_obj_set_width(*value_label, 220);
 }
 
 void create_page()
@@ -299,31 +407,44 @@ void create_page()
     lv_obj_center(empty);
 
     lv_obj_t *details_card =
-        create_card(g_screen, 518, 162, 254, 226, "Connection details");
+        create_card(g_screen, 518, 162, 254, 226, "Selected network");
 
-    lv_obj_t *details = create_label(
-        details_card,
-        "SSID\nNot selected\n\n"
-        "IP address\n---.---.---.---\n\n"
-        "Signal\n-- dBm",
-        &lv_font_montserrat_14,
-        lv_color_white());
-    lv_obj_set_pos(details, 0, 32);
-    lv_obj_set_style_text_line_space(details, 5, 0);
+    create_detail_row(
+        details_card, 32, "SSID", &g_selected_ssid_label);
+    create_detail_row(
+        details_card, 92, "Signal", &g_selected_signal_label);
+    create_detail_row(
+        details_card, 152, "Security", &g_selected_security_label);
+
+    update_selected_details();
 
     create_action_button(
-        g_screen, 166, "SCAN",
-        lv_color_hex(0x1F6C96), scan_event_cb);
-    create_action_button(
-        g_screen, 325, "CONNECT",
-        lv_color_hex(0x16824C), connect_event_cb);
-    create_action_button(
-        g_screen, 484, "DISCONNECT",
-        lv_color_hex(0x8C3A3A), disconnect_event_cb);
+        g_screen,
+        166,
+        "SCAN",
+        lv_color_hex(0x1F6C96),
+        scan_event_cb);
 
-    g_refresh_timer = lv_timer_create(refresh_timer_cb, 250, nullptr);
+    create_action_button(
+        g_screen,
+        325,
+        "CONNECT",
+        lv_color_hex(0x16824C),
+        connect_event_cb);
 
-    ESP_LOGI(TAG, "Network scan page created");
+    create_action_button(
+        g_screen,
+        484,
+        "DISCONNECT",
+        lv_color_hex(0x8C3A3A),
+        disconnect_event_cb);
+
+    g_refresh_timer = lv_timer_create(
+        refresh_timer_cb,
+        250,
+        nullptr);
+
+    ESP_LOGI(TAG, "Network selection page created");
 }
 
 } // namespace
