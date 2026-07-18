@@ -1,0 +1,2 @@
+source C:/ESPHome/EcoPower-Control-Center/build/bootloader/gdbinit/symbols
+source C:/ESPHome/EcoPower-Control-Center/build/bootloader/gdbinit/connect
