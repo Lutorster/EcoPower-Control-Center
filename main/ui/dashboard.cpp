@@ -3,6 +3,7 @@
 #include "core/energy_model.h"
 #include "widgets/value_label.h"
 #include "widgets/flow_dot.h"
+#include "inverter_page.h"
 #include "lvgl.h"
 #include "esp_log.h"
 
@@ -41,23 +42,23 @@ static void create_value_widgets(lv_obj_t *parent)
     const lv_color_t primary = lv_color_hex(0xDCE8F2);
     const lv_color_t secondary = lv_color_hex(0xC5CED8);
 
-    g_view.clock.create(parent, 688, 10, 94, 22, &lv_font_montserrat_16, lv_color_white());
-    g_view.date.create(parent, 699, 32, 75, 15, &lv_font_montserrat_12, secondary);
+    g_view.clock.create(parent, 676, 8, 108, 25, &lv_font_montserrat_16, lv_color_white());
+    g_view.date.create(parent, 680, 33, 104, 17, &lv_font_montserrat_12, secondary);
     g_view.inverter_temp.create(parent, 41, 119, 54, 21, &lv_font_montserrat_12, primary, LV_TEXT_ALIGN_LEFT);
     g_view.efficiency.create(parent, 44, 276, 51, 20, &lv_font_montserrat_12, primary, LV_TEXT_ALIGN_LEFT);
     g_view.uptime.create(parent, 43, 349, 53, 19, &lv_font_montserrat_12, primary, LV_TEXT_ALIGN_LEFT);
 
-    g_view.pv_power.create(parent, 181, 109, 68, 28, &lv_font_montserrat_16, primary);
-    g_view.pv_vi.create(parent, 181, 145, 70, 31, &lv_font_montserrat_12, secondary);
-    g_view.inverter_power.create(parent, 339, 139, 78, 35, &lv_font_montserrat_20, primary);
-    g_view.inverter_vf.create(parent, 327, 195, 103, 19, &lv_font_montserrat_12, secondary);
-    g_view.grid_power.create(parent, 564, 108, 77, 30, &lv_font_montserrat_16, primary);
-    g_view.grid_vf.create(parent, 519, 161, 121, 17, &lv_font_montserrat_12, secondary);
-    g_view.battery_soc.create(parent, 258, 294, 68, 31, &lv_font_montserrat_20, primary);
-    g_view.battery_vi.create(parent, 199, 344, 137, 18, &lv_font_montserrat_12, secondary);
-    g_view.battery_power_temp.create(parent, 201, 365, 136, 16, &lv_font_montserrat_12, secondary);
-    g_view.house_power.create(parent, 477, 295, 83, 30, &lv_font_montserrat_16, primary);
-    g_view.house_phases.create(parent, 481, 327, 80, 52, &lv_font_montserrat_12, secondary, LV_TEXT_ALIGN_LEFT);
+    g_view.pv_power.create(parent, 166, 104, 96, 34, &lv_font_montserrat_16, primary);
+    g_view.pv_vi.create(parent, 165, 141, 99, 38, &lv_font_montserrat_12, secondary);
+    g_view.inverter_power.create(parent, 321, 132, 116, 43, &lv_font_montserrat_20, primary);
+    g_view.inverter_vf.create(parent, 314, 190, 131, 25, &lv_font_montserrat_12, secondary);
+    g_view.grid_power.create(parent, 548, 102, 106, 38, &lv_font_montserrat_16, primary);
+    g_view.grid_vf.create(parent, 513, 155, 143, 25, &lv_font_montserrat_12, secondary);
+    g_view.battery_soc.create(parent, 239, 287, 99, 40, &lv_font_montserrat_20, primary);
+    g_view.battery_vi.create(parent, 190, 338, 155, 24, &lv_font_montserrat_12, secondary);
+    g_view.battery_power_temp.create(parent, 190, 363, 155, 22, &lv_font_montserrat_12, secondary);
+    g_view.house_power.create(parent, 462, 288, 113, 38, &lv_font_montserrat_16, primary);
+    g_view.house_phases.create(parent, 468, 326, 106, 58, &lv_font_montserrat_12, secondary, LV_TEXT_ALIGN_LEFT);
 }
 
 static void create_flow_widgets(lv_obj_t *parent)
@@ -112,9 +113,9 @@ static void update_flows(const EnergyData &data)
 
 static void timer_cb(lv_timer_t *)
 {
-    constexpr unsigned tick_ms = 100;
+    constexpr unsigned tick_ms = 200;
     g_elapsed_ms += tick_ms;
-    g_animation_step += 2;
+    g_animation_step += 4;
     ecopower_energy_model_tick(tick_ms);
 
     EnergyData data = {};
@@ -127,7 +128,10 @@ static void menu_event_cb(lv_event_t *event)
 {
     const intptr_t index = reinterpret_cast<intptr_t>(lv_event_get_user_data(event));
     static const char *names[] = {"Dashboard", "PV", "Battery", "Inverter", "Graphs", "Settings", "Alarm", "More"};
-    if (index >= 0 && index < 8) ESP_LOGI(TAG, "Menu pressed: %s", names[index]);
+    if (index >= 0 && index < 8) {
+        ESP_LOGI(TAG, "Menu pressed: %s", names[index]);
+        if (index == 3) ecopower_inverter_page_show();
+    }
 }
 
 static void create_menu_touch_zones(lv_obj_t *parent)
@@ -178,7 +182,7 @@ extern "C" void ecopower_dashboard_show(void)
             ecopower_energy_model_get(&initial);
             update_labels(initial);
             update_flows(initial);
-            g_timer = lv_timer_create(timer_cb, 100, nullptr);
+            g_timer = lv_timer_create(timer_cb, 200, nullptr);
             ESP_LOGI(TAG, "EcoPower OS v3 widgets ready; demo=%s",
                      ecopower_energy_model_demo_enabled() ? "on" : "off");
         } else {
