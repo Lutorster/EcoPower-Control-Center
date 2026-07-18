@@ -4,6 +4,7 @@
 #include "widgets/value_label.h"
 #include "widgets/flow_dot.h"
 #include "inverter_page.h"
+#include "settings_page.h"
 #include "lvgl.h"
 #include "esp_log.h"
 
@@ -424,6 +425,8 @@ static void menu_event_cb(lv_event_t *event)
 
         if (index == 3) {
             ecopower_inverter_page_show();
+        } else if (index == 5) {
+            ecopower_settings_page_show();
         }
     }
 }

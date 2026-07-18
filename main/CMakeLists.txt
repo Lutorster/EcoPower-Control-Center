@@ -8,6 +8,8 @@ idf_component_register(
         "ui/theme.cpp"
         "ui/dashboard.cpp"
         "ui/inverter_page.cpp"
+        "ui/settings_page.cpp"
+        "ui/network_page.cpp"
         "ui/startup.cpp"
         "ui/widgets/value_label.cpp"
         "ui/widgets/flow_dot.cpp"
@@ -15,6 +17,7 @@ idf_component_register(
         "drivers/sd_card.cpp"
         "drivers/deye_rs485.cpp"
         "drivers/jk_bms.cpp"
+        "drivers/wifi_manager.cpp"
     INCLUDE_DIRS
         "."
         "ui"
@@ -22,6 +25,12 @@ idf_component_register(
         "drivers"
         "app"
         "ui/widgets"
+    REQUIRES
+        esp_wifi
+        esp_event
+        esp_netif
+        nvs_flash
+        fatfs
 )
 
 idf_component_get_property(lvgl_lib lvgl__lvgl COMPONENT_LIB)
