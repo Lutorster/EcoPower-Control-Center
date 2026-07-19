@@ -18,6 +18,7 @@ idf_component_register(
         "drivers/deye_rs485.cpp"
         "drivers/jk_bms.cpp"
         "drivers/wifi_manager.cpp"
+        "drivers/time_manager.cpp"
     INCLUDE_DIRS
         "."
         "ui"
@@ -31,6 +32,7 @@ idf_component_register(
         esp_netif
         nvs_flash
         fatfs
+        lwip
 )
 
 idf_component_get_property(lvgl_lib lvgl__lvgl COMPONENT_LIB)

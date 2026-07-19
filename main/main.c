@@ -6,6 +6,7 @@
 #include "app/app_version.h"
 #include "drivers/deye_rs485.h"
 #include "drivers/wifi_manager.h"
+#include "drivers/time_manager.h"
 #include "esp_log.h"
 
 static const char *MAIN_TAG = "EcoPower";
@@ -27,6 +28,12 @@ void app_main(void)
     if (wifi_init != ESP_OK) {
         ESP_LOGE(MAIN_TAG, "Wi-Fi manager init failed: %s",
                  esp_err_to_name(wifi_init));
+    }
+
+    const esp_err_t time_init = ecopower_time_manager_init();
+    if (time_init != ESP_OK) {
+        ESP_LOGE(MAIN_TAG, "Time manager init failed: %s",
+                 esp_err_to_name(time_init));
     }
 
     if (lvgl_port_lock(-1)) {
