@@ -9,6 +9,7 @@ extern "C" {
 #endif
 
 esp_err_t ecopower_time_manager_init(void);
+esp_err_t ecopower_time_manager_resynchronize(void);
 
 bool ecopower_time_manager_is_initialized(void);
 bool ecopower_time_manager_is_synchronized(void);

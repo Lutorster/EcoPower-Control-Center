@@ -2,20 +2,29 @@
 
 #include "dashboard.h"
 #include "network_page.h"
+#include "mqtt_page.h"
+#include "system_page.h"
+#include "time_page.h"
+#include "drivers/wifi_manager.h"
+#include "drivers/time_manager.h"
+#include "drivers/mqtt_manager.h"
 #include "lvgl.h"
 #include "esp_log.h"
 
 #include <cstdint>
+#include <cstdio>
 
 static const char *TAG = "EcoPower_Settings";
 static lv_obj_t *g_screen = nullptr;
+static lv_obj_t *g_status_label = nullptr;
+static lv_timer_t *g_status_timer = nullptr;
 
 namespace {
 
 enum class SettingsItem : intptr_t {
     Network = 0,
     TimeDate,
-    Display,
+    Mqtt,
     System,
     About,
 };
@@ -30,6 +39,84 @@ lv_obj_t *create_label(lv_obj_t *parent,
     lv_obj_set_style_text_font(label, font, 0);
     lv_obj_set_style_text_color(label, color, 0);
     return label;
+}
+
+const char *wifi_state_text(EcoPowerWifiState state)
+{
+    switch (state) {
+        case ECOPOWER_WIFI_CONNECTING:
+            return "Connecting";
+        case ECOPOWER_WIFI_CONNECTED:
+            return "Connected";
+        case ECOPOWER_WIFI_FAILED:
+            return "Failed";
+        case ECOPOWER_WIFI_DISCONNECTED:
+        default:
+            return "Disconnected";
+    }
+}
+
+
+const char *mqtt_state_text(EcoPowerMqttState state)
+{
+    switch (state) {
+        case ECOPOWER_MQTT_CONNECTING:
+            return "Connecting";
+        case ECOPOWER_MQTT_CONNECTED:
+            return "Connected";
+        case ECOPOWER_MQTT_ERROR:
+            return "Error";
+        case ECOPOWER_MQTT_DISABLED:
+            return "Not configured";
+        case ECOPOWER_MQTT_DISCONNECTED:
+        default:
+            return "Disconnected";
+    }
+}
+
+void update_current_status()
+{
+    if (g_status_label == nullptr) {
+        return;
+    }
+
+    const EcoPowerWifiState wifi_state =
+        ecopower_wifi_manager_get_state();
+
+    char ssid[33] = {};
+    char ip_address[16] = {};
+//    char time_text[16] = {};
+
+    ecopower_wifi_manager_get_connected_ssid(
+        ssid, sizeof(ssid));
+    ecopower_wifi_manager_get_ip_address(
+        ip_address, sizeof(ip_address));
+
+    const bool ntp_synchronized =
+        ecopower_time_manager_is_synchronized();
+
+    char status_text[256] = {};
+    snprintf(
+        status_text,
+        sizeof(status_text),
+        "Wi-Fi: %s\n"
+        "SSID: %s\n"
+        "IP: %s   RSSI: %d dBm\n"
+        "NTP: %s\n"
+        "MQTT: %s",
+        wifi_state_text(wifi_state),
+        ssid[0] != '\0' ? ssid : "---",
+        ip_address[0] != '\0' ? ip_address : "---",
+        static_cast<int>(ecopower_wifi_manager_get_rssi()),
+        ntp_synchronized ? "Synchronized" : "Not synchronized",
+        mqtt_state_text(ecopower_mqtt_manager_get_state()));
+
+    lv_label_set_text(g_status_label, status_text);
+}
+
+void status_timer_cb(lv_timer_t *)
+{
+    update_current_status();
 }
 
 void back_event_cb(lv_event_t *)
@@ -49,12 +136,15 @@ void item_event_cb(lv_event_t *event)
             break;
         case SettingsItem::TimeDate:
             ESP_LOGI(TAG, "Time & Date settings selected");
+            ecopower_time_page_show();
             break;
-        case SettingsItem::Display:
-            ESP_LOGI(TAG, "Display settings selected");
+        case SettingsItem::Mqtt:
+            ESP_LOGI(TAG, "MQTT settings selected");
+            ecopower_mqtt_page_show();
             break;
         case SettingsItem::System:
             ESP_LOGI(TAG, "System settings selected");
+            ecopower_system_page_show();
             break;
         case SettingsItem::About:
             ESP_LOGI(TAG, "About selected");
@@ -156,9 +246,9 @@ void create_page()
 
     create_settings_button(
         g_screen, 28, 194,
-        "Display",
-        "Brightness and screen preferences",
-        SettingsItem::Display);
+        "MQTT",
+        "Broker connection and telemetry topics",
+        SettingsItem::Mqtt);
 
     create_settings_button(
         g_screen, 430, 194,
@@ -187,14 +277,17 @@ void create_page()
         status_panel, "Current status", &lv_font_montserrat_16, lv_color_white());
     lv_obj_set_pos(status_title, 0, 0);
 
-    lv_obj_t *status = create_label(
+    g_status_label = create_label(
         status_panel,
-        "Wi-Fi: not configured\n"
-        "Time: not synchronized\n"
-        "Mode: local",
+        "Loading status...",
         &lv_font_montserrat_12,
         lv_color_hex(0x8FAFC4));
-    lv_obj_set_pos(status, 0, 30);
+    lv_obj_set_pos(g_status_label, 0, 30);
+    lv_label_set_long_mode(g_status_label, LV_LABEL_LONG_CLIP);
+    lv_obj_set_size(g_status_label, 312, 78);
+
+    update_current_status();
+    g_status_timer = lv_timer_create(status_timer_cb, 1000, nullptr);
 
     ESP_LOGI(TAG, "Settings page created");
 }
@@ -207,6 +300,7 @@ extern "C" void ecopower_settings_page_show(void)
         create_page();
     }
 
+    update_current_status();
     lv_scr_load(g_screen);
     ESP_LOGI(TAG, "Settings page shown");
 }

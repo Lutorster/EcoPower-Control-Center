@@ -511,6 +511,43 @@ void disconnect_event_cb(lv_event_t *)
     }
 }
 
+void forget_network_event_cb(lv_event_t *)
+{
+    const esp_err_t error =
+        ecopower_wifi_manager_forget_network();
+
+    if (error == ESP_OK) {
+        g_selected_ssid[0] = '\0';
+        g_selected_rssi = 0;
+        g_selected_secured = false;
+        update_selected_details();
+
+        clear_network_list();
+        lv_obj_t *message = create_label(
+            g_network_list,
+            "Saved network forgotten. Press SCAN to connect again.",
+            &lv_font_montserrat_14,
+            lv_color_hex(0x8FAFC4));
+        lv_obj_center(message);
+
+        lv_label_set_text(g_status_text, "Saved network forgotten");
+        lv_obj_set_style_bg_color(
+            g_status_dot, lv_color_hex(0x8FAFC4), 0);
+
+        g_last_wifi_state = ECOPOWER_WIFI_DISCONNECTED;
+        ESP_LOGI(TAG, "Saved Wi-Fi network forgotten");
+    } else {
+        lv_label_set_text(g_status_text, "Unable to forget network");
+        lv_obj_set_style_bg_color(
+            g_status_dot, lv_color_hex(0xFF5C5C), 0);
+
+        ESP_LOGE(
+            TAG,
+            "Forget network failed: %s",
+            esp_err_to_name(error));
+    }
+}
+
 lv_obj_t *create_action_button(lv_obj_t *parent,
                                int x,
                                const char *text,
@@ -668,24 +705,31 @@ void create_page()
 
     create_action_button(
         g_screen,
-        166,
+        85,
         "SCAN",
         lv_color_hex(0x1F6C96),
         scan_event_cb);
 
     create_action_button(
         g_screen,
-        325,
+        245,
         "CONNECT",
         lv_color_hex(0x16824C),
         connect_event_cb);
 
     create_action_button(
         g_screen,
-        484,
+        405,
         "DISCONNECT",
         lv_color_hex(0x8C3A3A),
         disconnect_event_cb);
+
+    create_action_button(
+        g_screen,
+        565,
+        "FORGET NETWORK",
+        lv_color_hex(0x6D304A),
+        forget_network_event_cb);
 
     g_password_overlay = lv_obj_create(g_screen);
     lv_obj_remove_style_all(g_password_overlay);

@@ -4,9 +4,10 @@
 #include "drivers/sd_card.h"
 #include "lvgl_port.h"
 #include "app/app_version.h"
-#include "drivers/deye_rs485.h"
 #include "drivers/wifi_manager.h"
 #include "drivers/time_manager.h"
+#include "drivers/mqtt_manager.h"
+#include "deye/deye_driver.h"
 #include "esp_log.h"
 
 static const char *MAIN_TAG = "EcoPower";
@@ -36,6 +37,14 @@ void app_main(void)
                  esp_err_to_name(time_init));
     }
 
+    const esp_err_t mqtt_init = ecopower_mqtt_manager_init();
+    if (mqtt_init != ESP_OK) {
+        ESP_LOGE(MAIN_TAG, "MQTT manager init failed: %s",
+                 esp_err_to_name(mqtt_init));
+    }
+
+    ESP_ERROR_CHECK(ecopower_deye_driver_init());
+
     if (lvgl_port_lock(-1)) {
         ecopower_ui_start();
         lvgl_port_unlock();
@@ -43,10 +52,4 @@ void app_main(void)
 
     ESP_LOGI(MAIN_TAG, "%s %s UI started", ECOPOWER_APP_NAME, ECOPOWER_APP_VERSION);
 
-    const esp_err_t rs485_init = ecopower_deye_rs485_init();
-    if (rs485_init == ESP_OK) {
-        ESP_ERROR_CHECK_WITHOUT_ABORT(ecopower_deye_rs485_start());
-    } else {
-        ESP_LOGE(MAIN_TAG, "Deye RS485 init failed: %s", esp_err_to_name(rs485_init));
-    }
 }

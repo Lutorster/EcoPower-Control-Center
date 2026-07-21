@@ -74,13 +74,33 @@ void time_sync_notification(struct timeval *)
             datetime,
             sizeof(datetime),
             "%d.%m.%Y %H:%M:%S")) {
-        ESP_LOGI(
-            TAG,
-            "Time synchronized: %s",
-            datetime);
+        ESP_LOGI(TAG, "Time synchronized: %s", datetime);
     } else {
         ESP_LOGI(TAG, "Time synchronized");
     }
+}
+
+void start_sntp()
+{
+    if (esp_sntp_enabled()) {
+        esp_sntp_stop();
+    }
+
+    esp_sntp_setoperatingmode(ESP_SNTP_OPMODE_POLL);
+
+    esp_sntp_setservername(
+        0,
+        const_cast<char *>(kPrimaryServer));
+
+    esp_sntp_setservername(
+        1,
+        const_cast<char *>(kSecondaryServer));
+
+    esp_sntp_set_time_sync_notification_cb(
+        time_sync_notification);
+
+    esp_sntp_set_sync_mode(SNTP_SYNC_MODE_SMOOTH);
+    esp_sntp_init();
 }
 
 } // namespace
@@ -94,36 +114,25 @@ extern "C" esp_err_t ecopower_time_manager_init(void)
     setenv("TZ", kTimezone, 1);
     tzset();
 
-    if (esp_sntp_enabled()) {
-        esp_sntp_stop();
-    }
-
-    esp_sntp_setoperatingmode(
-        ESP_SNTP_OPMODE_POLL);
-
-    esp_sntp_setservername(
-        0,
-        const_cast<char *>(kPrimaryServer));
-
-    esp_sntp_setservername(
-        1,
-        const_cast<char *>(kSecondaryServer));
-
-    esp_sntp_set_time_sync_notification_cb(
-        time_sync_notification);
-
-    esp_sntp_set_sync_mode(
-        SNTP_SYNC_MODE_SMOOTH);
-
-    esp_sntp_init();
+    start_sntp();
 
     g_synchronized = system_time_is_valid();
     g_initialized = true;
 
-    ESP_LOGI(
-        TAG,
-        "SNTP started; timezone=Europe/Kyiv");
+    ESP_LOGI(TAG, "SNTP started; timezone=Europe/Kyiv");
+    return ESP_OK;
+}
 
+extern "C" esp_err_t ecopower_time_manager_resynchronize(void)
+{
+    if (!g_initialized) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    g_synchronized = false;
+    start_sntp();
+
+    ESP_LOGI(TAG, "Manual SNTP synchronization requested");
     return ESP_OK;
 }
 

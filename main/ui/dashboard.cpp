@@ -5,6 +5,9 @@
 #include "widgets/flow_dot.h"
 #include "inverter_page.h"
 #include "settings_page.h"
+#include "drivers/time_manager.h"
+#include "drivers/wifi_manager.h"
+#include "drivers/mqtt_manager.h"
 #include "lvgl.h"
 #include "esp_log.h"
 
@@ -26,6 +29,8 @@ struct GaugeSegment {
 struct DashboardView {
     ValueLabel clock;
     ValueLabel date;
+    lv_obj_t *wifi_icon = nullptr;
+    lv_obj_t *mqtt_indicator = nullptr;
     ValueLabel inverter_temp;
     ValueLabel efficiency;
     ValueLabel uptime;
@@ -66,7 +71,7 @@ static void create_mask(lv_obj_t *parent, int x, int y, int w, int h)
 
 static void create_value_masks(lv_obj_t *parent)
 {
-    // Годинник і дата
+    // Годинник і дата. Штатну Wi-Fi іконку з dashboard.png не маскуємо.
     create_mask(parent, 690, 4, 103, 43);
 
     // Ліва інформаційна панель
@@ -204,6 +209,47 @@ static void create_value_widgets(lv_obj_t *parent)
     const lv_color_t primary = lv_color_hex(0xDCE8F2);
     const lv_color_t secondary = lv_color_hex(0xC5CED8);
 
+    /*
+     * Динамічний статус накладається точно поверх штатної Wi-Fi іконки
+     * у верхній панелі dashboard.png. Нових елементів біля годинника немає.
+     */
+    g_view.wifi_icon = lv_label_create(parent);
+    lv_label_set_text(g_view.wifi_icon, LV_SYMBOL_WIFI);
+    lv_obj_set_pos(g_view.wifi_icon, 225, 14);
+    lv_obj_set_style_text_font(
+        g_view.wifi_icon,
+        &lv_font_montserrat_20,
+        0);
+    lv_obj_set_style_text_color(
+        g_view.wifi_icon,
+        lv_color_hex(0x8FAFC4),
+        0);
+    lv_obj_clear_flag(g_view.wifi_icon, LV_OBJ_FLAG_SCROLLABLE);
+
+    /*
+     * Малий індикатор MQTT накладається точно поверх зеленого кружка,
+     * який уже намальований у dashboard.png. Дизайн PNG не змінюємо.
+     */
+    g_view.mqtt_indicator = lv_obj_create(parent);
+    lv_obj_remove_style_all(g_view.mqtt_indicator);
+    lv_obj_set_pos(g_view.mqtt_indicator, 326, 20);
+    lv_obj_set_size(g_view.mqtt_indicator, 9, 9);
+    lv_obj_set_style_radius(
+        g_view.mqtt_indicator,
+        LV_RADIUS_CIRCLE,
+        0);
+    lv_obj_set_style_bg_color(
+        g_view.mqtt_indicator,
+        lv_color_hex(0x8FAFC4),
+        0);
+    lv_obj_set_style_bg_opa(
+        g_view.mqtt_indicator,
+        LV_OPA_COVER,
+        0);
+    lv_obj_clear_flag(
+        g_view.mqtt_indicator,
+        LV_OBJ_FLAG_SCROLLABLE);
+
     g_view.clock.create(parent, 690, 7, 102, 23,
                         &lv_font_montserrat_16, lv_color_white());
     g_view.date.create(parent, 694, 30, 98, 16,
@@ -267,14 +313,82 @@ static void create_flow_widgets(lv_obj_t *parent)
 
 static void update_labels(const EnergyData &data)
 {
-    const unsigned seconds_total =
-        14U * 3600U + 36U * 60U + 15U + g_elapsed_ms / 1000U;
-    const unsigned hh = (seconds_total / 3600U) % 24U;
-    const unsigned mm = (seconds_total / 60U) % 60U;
-    const unsigned ss = seconds_total % 60U;
+    char time_text[8] = {};
+    char date_text[16] = {};
 
-    g_view.clock.set_text_fmt("%02u:%02u:%02u", hh, mm, ss);
-    g_view.date.set_text("18.07.2026");
+    if (ecopower_time_manager_is_synchronized() &&
+        ecopower_time_manager_get_time(
+            time_text,
+            sizeof(time_text)) &&
+        ecopower_time_manager_get_date(
+            date_text,
+            sizeof(date_text))) {
+        g_view.clock.set_text(time_text);
+        g_view.date.set_text(date_text);
+    } else {
+        g_view.clock.set_text("--:--");
+        g_view.date.set_text("--.--.----");
+    }
+
+    const EcoPowerWifiState wifi_state =
+        ecopower_wifi_manager_get_state();
+
+    if (g_view.wifi_icon != nullptr) {
+        lv_color_t wifi_color = lv_color_hex(0x8FAFC4);
+
+        switch (wifi_state) {
+            case ECOPOWER_WIFI_CONNECTED:
+                wifi_color = lv_color_hex(0x20D878);
+                break;
+
+            case ECOPOWER_WIFI_CONNECTING:
+                wifi_color = lv_color_hex(0xFFD21C);
+                break;
+
+            case ECOPOWER_WIFI_FAILED:
+                wifi_color = lv_color_hex(0xFF5C5C);
+                break;
+
+            case ECOPOWER_WIFI_DISCONNECTED:
+            default:
+                wifi_color = lv_color_hex(0x8FAFC4);
+                break;
+        }
+
+        lv_obj_set_style_text_color(
+            g_view.wifi_icon,
+            wifi_color,
+            0);
+    }
+
+    if (g_view.mqtt_indicator != nullptr) {
+        lv_color_t mqtt_color = lv_color_hex(0x8FAFC4);
+
+        switch (ecopower_mqtt_manager_get_state()) {
+            case ECOPOWER_MQTT_CONNECTED:
+                mqtt_color = lv_color_hex(0x20D878);
+                break;
+
+            case ECOPOWER_MQTT_CONNECTING:
+                mqtt_color = lv_color_hex(0xFFD21C);
+                break;
+
+            case ECOPOWER_MQTT_ERROR:
+                mqtt_color = lv_color_hex(0xFF5C5C);
+                break;
+
+            case ECOPOWER_MQTT_DISABLED:
+            case ECOPOWER_MQTT_DISCONNECTED:
+            default:
+                mqtt_color = lv_color_hex(0x8FAFC4);
+                break;
+        }
+
+        lv_obj_set_style_bg_color(
+            g_view.mqtt_indicator,
+            mqtt_color,
+            0);
+    }
 
     g_view.inverter_temp.set_text_fmt("%.1f C", data.inverter_temp_c);
     g_view.efficiency.set_text_fmt("%.1f %%", data.efficiency_pct);

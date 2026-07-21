@@ -31,6 +31,9 @@ esp_err_t ecopower_wifi_manager_connect(
 
 esp_err_t ecopower_wifi_manager_disconnect(void);
 
+esp_err_t ecopower_wifi_manager_forget_network(void);
+bool ecopower_wifi_manager_has_saved_credentials(void);
+
 bool ecopower_wifi_manager_is_initialized(void);
 bool ecopower_wifi_manager_is_scanning(void);
 bool ecopower_wifi_manager_scan_ready(void);

@@ -10,15 +10,21 @@ idf_component_register(
         "ui/inverter_page.cpp"
         "ui/settings_page.cpp"
         "ui/network_page.cpp"
+        "ui/mqtt_page.cpp"
+        "ui/system_page.cpp"
+        "ui/time_page.cpp"
         "ui/startup.cpp"
         "ui/widgets/value_label.cpp"
         "ui/widgets/flow_dot.cpp"
         "core/energy_model.cpp"
         "drivers/sd_card.cpp"
-        "drivers/deye_rs485.cpp"
         "drivers/jk_bms.cpp"
         "drivers/wifi_manager.cpp"
         "drivers/time_manager.cpp"
+        "drivers/mqtt_manager.cpp"
+        "drivers/rs485_port.cpp"
+        "drivers/modbus_rtu_master.cpp"
+        "deye/deye_driver.cpp"
     INCLUDE_DIRS
         "."
         "ui"
@@ -33,6 +39,8 @@ idf_component_register(
         nvs_flash
         fatfs
         lwip
+        driver
+        mqtt
 )
 
 idf_component_get_property(lvgl_lib lvgl__lvgl COMPONENT_LIB)
