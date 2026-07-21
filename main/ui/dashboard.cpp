@@ -8,12 +8,15 @@
 #include "drivers/time_manager.h"
 #include "drivers/wifi_manager.h"
 #include "drivers/mqtt_manager.h"
+#include "drivers/ha_discovery.h"
+#include "drivers/rs485_port.h"
 #include "lvgl.h"
 #include "esp_log.h"
 
 #include <cstdint>
 #include <cstddef>
 #include <cmath>
+#include <cstdio>
 
 static const char *TAG = "EcoPower_Dashboard";
 static lv_obj_t *g_screen = nullptr;
@@ -31,6 +34,9 @@ struct DashboardView {
     ValueLabel date;
     lv_obj_t *wifi_icon = nullptr;
     lv_obj_t *mqtt_indicator = nullptr;
+    lv_obj_t *rs485_indicator = nullptr;
+    lv_obj_t *sd_indicator = nullptr;
+    lv_obj_t *ha_indicator = nullptr;
     ValueLabel inverter_temp;
     ValueLabel efficiency;
     ValueLabel uptime;
@@ -250,6 +256,78 @@ static void create_value_widgets(lv_obj_t *parent)
         g_view.mqtt_indicator,
         LV_OBJ_FLAG_SCROLLABLE);
 
+    /*
+     * RS485 status dot overlay.
+     * Covers only the existing RS485 dot in dashboard.png.
+     */
+    g_view.rs485_indicator = lv_obj_create(parent);
+    lv_obj_remove_style_all(g_view.rs485_indicator);
+    lv_obj_set_pos(g_view.rs485_indicator, 421, 20);
+    lv_obj_set_size(g_view.rs485_indicator, 9, 9);
+    lv_obj_set_style_radius(
+        g_view.rs485_indicator,
+        LV_RADIUS_CIRCLE,
+        0);
+    lv_obj_set_style_bg_color(
+        g_view.rs485_indicator,
+        lv_color_hex(0x8FAFC4),
+        0);
+    lv_obj_set_style_bg_opa(
+        g_view.rs485_indicator,
+        LV_OPA_COVER,
+        0);
+    lv_obj_clear_flag(
+        g_view.rs485_indicator,
+        LV_OBJ_FLAG_SCROLLABLE);
+
+    /*
+     * SD status dot overlay.
+     * Covers only the existing SD dot in dashboard.png.
+     */
+    g_view.sd_indicator = lv_obj_create(parent);
+    lv_obj_remove_style_all(g_view.sd_indicator);
+    lv_obj_set_pos(g_view.sd_indicator, 576, 20);
+    lv_obj_set_size(g_view.sd_indicator, 9, 9);
+    lv_obj_set_style_radius(
+        g_view.sd_indicator,
+        LV_RADIUS_CIRCLE,
+        0);
+    lv_obj_set_style_bg_color(
+        g_view.sd_indicator,
+        lv_color_hex(0x8FAFC4),
+        0);
+    lv_obj_set_style_bg_opa(
+        g_view.sd_indicator,
+        LV_OPA_COVER,
+        0);
+    lv_obj_clear_flag(
+        g_view.sd_indicator,
+        LV_OBJ_FLAG_SCROLLABLE);
+
+    /*
+     * Home Assistant status dot overlay.
+     * Covers only the existing HA dot in dashboard.png.
+     */
+    g_view.ha_indicator = lv_obj_create(parent);
+    lv_obj_remove_style_all(g_view.ha_indicator);
+    lv_obj_set_pos(g_view.ha_indicator, 501, 20);
+    lv_obj_set_size(g_view.ha_indicator, 9, 9);
+    lv_obj_set_style_radius(
+        g_view.ha_indicator,
+        LV_RADIUS_CIRCLE,
+        0);
+    lv_obj_set_style_bg_color(
+        g_view.ha_indicator,
+        lv_color_hex(0x8FAFC4),
+        0);
+    lv_obj_set_style_bg_opa(
+        g_view.ha_indicator,
+        LV_OPA_COVER,
+        0);
+    lv_obj_clear_flag(
+        g_view.ha_indicator,
+        LV_OBJ_FLAG_SCROLLABLE);
+
     g_view.clock.create(parent, 690, 7, 102, 23,
                         &lv_font_montserrat_16, lv_color_white());
     g_view.date.create(parent, 694, 30, 98, 16,
@@ -387,6 +465,66 @@ static void update_labels(const EnergyData &data)
         lv_obj_set_style_bg_color(
             g_view.mqtt_indicator,
             mqtt_color,
+            0);
+    }
+
+    if (g_view.rs485_indicator != nullptr) {
+        const lv_color_t rs485_color =
+            ecopower_rs485_is_initialized()
+                ? lv_color_hex(0x20D878)
+                : lv_color_hex(0x8FAFC4);
+
+        lv_obj_set_style_bg_color(
+            g_view.rs485_indicator,
+            rs485_color,
+            0);
+    }
+
+    if (g_view.sd_indicator != nullptr) {
+        bool sd_ready = false;
+
+        FILE *sd_test =
+            fopen("/sdcard/assets/dashboard.png", "rb");
+
+        if (sd_test != nullptr) {
+            sd_ready = true;
+            fclose(sd_test);
+        }
+
+        lv_obj_set_style_bg_color(
+            g_view.sd_indicator,
+            sd_ready
+                ? lv_color_hex(0x20D878)
+                : lv_color_hex(0xFF5C5C),
+            0);
+    }
+
+    if (g_view.ha_indicator != nullptr) {
+        lv_color_t ha_color = lv_color_hex(0x8FAFC4);
+
+        switch (ecopower_ha_discovery_get_state()) {
+            case ECOPOWER_HA_READY:
+                ha_color = lv_color_hex(0x20D878);
+                break;
+
+            case ECOPOWER_HA_PUBLISHING:
+                ha_color = lv_color_hex(0xFFD21C);
+                break;
+
+            case ECOPOWER_HA_ERROR:
+                ha_color = lv_color_hex(0xFF5C5C);
+                break;
+
+            case ECOPOWER_HA_WAITING_MQTT:
+            case ECOPOWER_HA_DISABLED:
+            default:
+                ha_color = lv_color_hex(0x8FAFC4);
+                break;
+        }
+
+        lv_obj_set_style_bg_color(
+            g_view.ha_indicator,
+            ha_color,
             0);
     }
 

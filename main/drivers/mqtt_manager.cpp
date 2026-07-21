@@ -429,16 +429,35 @@ extern "C" bool ecopower_mqtt_manager_is_connected(void)
            ECOPOWER_MQTT_CONNECTED;
 }
 
-extern "C" int ecopower_mqtt_manager_publish(
-    const char *topic_suffix,
+extern "C" int ecopower_mqtt_manager_publish_topic(
+    const char *topic,
     const char *payload,
     int qos,
     bool retain)
 {
     if (!ecopower_mqtt_manager_is_connected() ||
         g_client == nullptr ||
-        topic_suffix == nullptr ||
+        topic == nullptr ||
         payload == nullptr) {
+        return -1;
+    }
+
+    return esp_mqtt_client_publish(
+        g_client,
+        topic,
+        payload,
+        0,
+        qos,
+        retain);
+}
+
+extern "C" int ecopower_mqtt_manager_publish(
+    const char *topic_suffix,
+    const char *payload,
+    int qos,
+    bool retain)
+{
+    if (topic_suffix == nullptr || payload == nullptr) {
         return -1;
     }
 
@@ -455,11 +474,9 @@ extern "C" int ecopower_mqtt_manager_publish(
         snprintf(topic, sizeof(topic), "%s", topic_suffix);
     }
 
-    return esp_mqtt_client_publish(
-        g_client,
+    return ecopower_mqtt_manager_publish_topic(
         topic,
         payload,
-        0,
         qos,
         retain);
 }

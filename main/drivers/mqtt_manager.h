@@ -42,6 +42,12 @@ int ecopower_mqtt_manager_publish(
     int qos,
     bool retain);
 
+int ecopower_mqtt_manager_publish_topic(
+    const char *topic,
+    const char *payload,
+    int qos,
+    bool retain);
+
 #ifdef __cplusplus
 }
 #endif

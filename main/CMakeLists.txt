@@ -22,6 +22,7 @@ idf_component_register(
         "drivers/wifi_manager.cpp"
         "drivers/time_manager.cpp"
         "drivers/mqtt_manager.cpp"
+        "drivers/ha_discovery.cpp"
         "drivers/rs485_port.cpp"
         "drivers/modbus_rtu_master.cpp"
         "deye/deye_driver.cpp"
@@ -41,6 +42,7 @@ idf_component_register(
         lwip
         driver
         mqtt
+        esp_timer
 )
 
 idf_component_get_property(lvgl_lib lvgl__lvgl COMPONENT_LIB)

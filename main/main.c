@@ -7,6 +7,7 @@
 #include "drivers/wifi_manager.h"
 #include "drivers/time_manager.h"
 #include "drivers/mqtt_manager.h"
+#include "drivers/ha_discovery.h"
 #include "deye/deye_driver.h"
 #include "esp_log.h"
 
@@ -41,6 +42,12 @@ void app_main(void)
     if (mqtt_init != ESP_OK) {
         ESP_LOGE(MAIN_TAG, "MQTT manager init failed: %s",
                  esp_err_to_name(mqtt_init));
+    }
+
+    const esp_err_t ha_init = ecopower_ha_discovery_init();
+    if (ha_init != ESP_OK) {
+        ESP_LOGE(MAIN_TAG, "HA discovery init failed: %s",
+                 esp_err_to_name(ha_init));
     }
 
     ESP_ERROR_CHECK(ecopower_deye_driver_init());
