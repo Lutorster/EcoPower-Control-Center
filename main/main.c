@@ -9,6 +9,8 @@
 #include "drivers/mqtt_manager.h"
 #include "drivers/ha_discovery.h"
 #include "deye/deye_driver.h"
+#include "core/inverter_manager.h"
+#include "core/daily_energy.h"
 #include "esp_log.h"
 
 static const char *MAIN_TAG = "EcoPower";
@@ -46,11 +48,24 @@ void app_main(void)
 
     const esp_err_t ha_init = ecopower_ha_discovery_init();
     if (ha_init != ESP_OK) {
-        ESP_LOGE(MAIN_TAG, "HA discovery init failed: %s",
+        ESP_LOGE(MAIN_TAG, "Home Assistant init failed: %s",
                  esp_err_to_name(ha_init));
     }
 
     ESP_ERROR_CHECK(ecopower_deye_driver_init());
+    ESP_ERROR_CHECK(ecopower_inverter_manager_init());
+
+    EcoPowerInverterConfig inverter = {};
+    inverter.slave_address = 1;
+    inverter.type = ECOPOWER_INVERTER_DEYE_HYBRID_1P;
+    inverter.phase_count = 1;
+    inverter.pv_input_count = 2;
+
+    ESP_ERROR_CHECK(
+        ecopower_inverter_manager_add(&inverter, NULL));
+
+    ESP_ERROR_CHECK(ecopower_inverter_manager_start());
+    ESP_ERROR_CHECK(ecopower_daily_energy_init());
 
     if (lvgl_port_lock(-1)) {
         ecopower_ui_start();

@@ -25,6 +25,13 @@ EcoPowerModbusResult ecopower_deye_read_holding_registers(
     uint16_t register_count,
     uint16_t *registers);
 
+/* Multi-inverter read. Uses the same RS485 bus with a selected slave ID. */
+EcoPowerModbusResult ecopower_deye_read_holding_registers_for_slave(
+    uint8_t slave_address,
+    uint16_t start_address,
+    uint16_t register_count,
+    uint16_t *registers);
+
 void ecopower_deye_get_diagnostics(
     EcoPowerDeyeDiagnostics *diagnostics);
 

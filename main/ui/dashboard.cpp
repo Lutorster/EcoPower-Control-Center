@@ -5,6 +5,7 @@
 #include "widgets/flow_dot.h"
 #include "inverter_page.h"
 #include "settings_page.h"
+#include "right_panel.h"
 #include "drivers/time_manager.h"
 #include "drivers/wifi_manager.h"
 #include "drivers/mqtt_manager.h"
@@ -659,6 +660,7 @@ static void timer_cb(lv_timer_t *)
 
     if ((g_elapsed_ms % 1000U) == 0U) {
         update_labels(data);
+        ecopower_right_panel_update();
     }
 }
 
@@ -739,6 +741,7 @@ extern "C" void ecopower_dashboard_show(void)
             create_battery_bar(g_screen);
             create_value_widgets(g_screen);
             create_flow_widgets(g_screen);
+            ecopower_right_panel_create(g_screen);
 
             ecopower_energy_model_init();
 

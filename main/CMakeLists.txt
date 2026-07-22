@@ -7,6 +7,7 @@ idf_component_register(
         "ui/assets.cpp"
         "ui/theme.cpp"
         "ui/dashboard.cpp"
+        "ui/right_panel.cpp"
         "ui/inverter_page.cpp"
         "ui/settings_page.cpp"
         "ui/network_page.cpp"
@@ -17,15 +18,19 @@ idf_component_register(
         "ui/widgets/value_label.cpp"
         "ui/widgets/flow_dot.cpp"
         "core/energy_model.cpp"
+        "core/daily_energy.cpp"
+        "core/inverter_manager.cpp"
         "drivers/sd_card.cpp"
         "drivers/jk_bms.cpp"
         "drivers/wifi_manager.cpp"
         "drivers/time_manager.cpp"
         "drivers/mqtt_manager.cpp"
-        "drivers/ha_discovery.cpp"
         "drivers/rs485_port.cpp"
         "drivers/modbus_rtu_master.cpp"
+	"drivers/ha_discovery.cpp"
         "deye/deye_driver.cpp"
+        "deye/deye_register_scanner.cpp"
+
     INCLUDE_DIRS
         "."
         "ui"
@@ -42,7 +47,6 @@ idf_component_register(
         lwip
         driver
         mqtt
-        esp_timer
 )
 
 idf_component_get_property(lvgl_lib lvgl__lvgl COMPONENT_LIB)

@@ -53,7 +53,9 @@ extern "C" bool ecopower_deye_driver_is_initialized(void)
     return g_initialized;
 }
 
-extern "C" EcoPowerModbusResult ecopower_deye_read_holding_registers(
+extern "C" EcoPowerModbusResult
+ecopower_deye_read_holding_registers_for_slave(
+    uint8_t slave_address,
     uint16_t start_address,
     uint16_t register_count,
     uint16_t *registers)
@@ -61,12 +63,12 @@ extern "C" EcoPowerModbusResult ecopower_deye_read_holding_registers(
     EcoPowerModbusResult result = {};
     result.status = ECOPOWER_MODBUS_IO_ERROR;
 
-    if (!g_initialized) {
+    if (!g_initialized || slave_address == 0U) {
         return result;
     }
 
     result = ecopower_modbus_read_holding_registers(
-        ECOPOWER_DEYE_SLAVE_ADDRESS,
+        slave_address,
         start_address,
         register_count,
         registers,
@@ -82,6 +84,18 @@ extern "C" EcoPowerModbusResult ecopower_deye_read_holding_registers(
     }
 
     return result;
+}
+
+extern "C" EcoPowerModbusResult ecopower_deye_read_holding_registers(
+    uint16_t start_address,
+    uint16_t register_count,
+    uint16_t *registers)
+{
+    return ecopower_deye_read_holding_registers_for_slave(
+        ECOPOWER_DEYE_SLAVE_ADDRESS,
+        start_address,
+        register_count,
+        registers);
 }
 
 extern "C" void ecopower_deye_get_diagnostics(
