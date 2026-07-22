@@ -1,10 +1,10 @@
 #include "daily_energy.h"
 
 #include "energy_model.h"
+#include "storage_manager.h"
 
 #include "esp_log.h"
 #include "esp_timer.h"
-#include "nvs.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
@@ -19,8 +19,7 @@ static const char *TAG = "EcoPower_Daily";
 
 namespace {
 
-constexpr const char *kNamespace = "eco_daily";
-constexpr const char *kBlobKey = "state";
+constexpr const char *kStateFile = "state/daily_energy.bin";
 constexpr uint32_t kStorageVersion = 1U;
 constexpr uint32_t kTaskPeriodMs = 1000U;
 constexpr int64_t kSavePeriodUs = 300LL * 1000000LL;
@@ -90,28 +89,12 @@ void reset_daily_locked(int32_t date_key)
 
 esp_err_t save_locked()
 {
-    nvs_handle_t handle = 0;
-    esp_err_t error =
-        nvs_open(kNamespace, NVS_READWRITE, &handle);
-
-    if (error != ESP_OK) {
-        return error;
-    }
-
     g_state.version = kStorageVersion;
 
-    error = nvs_set_blob(
-        handle,
-        kBlobKey,
+    return ecopower_storage_write_atomic(
+        kStateFile,
         &g_state,
         sizeof(g_state));
-
-    if (error == ESP_OK) {
-        error = nvs_commit(handle);
-    }
-
-    nvs_close(handle);
-    return error;
 }
 
 void load_state()
@@ -120,40 +103,41 @@ void load_state()
     g_state.version = kStorageVersion;
     g_state.last_soc_bucket = -1;
 
-    nvs_handle_t handle = 0;
-    esp_err_t error =
-        nvs_open(kNamespace, NVS_READONLY, &handle);
+    PersistedState loaded = {};
+    size_t size = 0U;
 
-    if (error != ESP_OK) {
-        ESP_LOGI(TAG, "No saved daily energy state");
+    const esp_err_t error = ecopower_storage_read(
+        kStateFile,
+        &loaded,
+        sizeof(loaded),
+        &size);
+
+    if (error == ESP_ERR_NOT_FOUND) {
+        ESP_LOGI(TAG, "No saved daily energy state on SD");
         return;
     }
 
-    size_t size = sizeof(g_state);
-    PersistedState loaded = {};
+    if (error != ESP_OK) {
+        ESP_LOGW(
+            TAG,
+            "Cannot read daily energy state from SD: %s",
+            esp_err_to_name(error));
+        return;
+    }
 
-    error = nvs_get_blob(
-        handle,
-        kBlobKey,
-        &loaded,
-        &size);
-
-    nvs_close(handle);
-
-    if (error == ESP_OK &&
-        size == sizeof(loaded) &&
+    if (size == sizeof(loaded) &&
         loaded.version == kStorageVersion &&
         loaded.soc_count <= ECOPOWER_SOC_HISTORY_POINTS &&
         loaded.soc_write_index < ECOPOWER_SOC_HISTORY_POINTS) {
         g_state = loaded;
         ESP_LOGI(
             TAG,
-            "Daily energy restored: PV=%.3f Load=%.3f Export=%.3f kWh",
+            "Daily energy restored from SD: PV=%.3f Load=%.3f Export=%.3f kWh",
             g_state.pv_production_kwh,
             g_state.consumption_kwh,
             g_state.grid_export_kwh);
     } else {
-        ESP_LOGW(TAG, "Saved daily energy state is invalid; starting clean");
+        ESP_LOGW(TAG, "SD daily energy state is invalid; starting clean");
     }
 }
 
@@ -278,7 +262,7 @@ void task_main(void *)
                 if (error != ESP_OK) {
                     ESP_LOGW(
                         TAG,
-                        "NVS save failed: %s",
+                        "SD state save failed: %s",
                         esp_err_to_name(error));
                 }
                 g_last_save_us = now_us;
