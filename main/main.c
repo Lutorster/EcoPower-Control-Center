@@ -11,6 +11,7 @@
 #include "deye/deye_driver.h"
 #include "core/inverter_manager.h"
 #include "core/daily_energy.h"
+#include "core/storage_manager.h"
 #include "esp_log.h"
 
 static const char *MAIN_TAG = "EcoPower";
@@ -27,6 +28,15 @@ void app_main(void)
 
     const bool sd_ok = ecopower_sd_init();
     ESP_LOGI(MAIN_TAG, "SD initialization: %s", sd_ok ? "OK" : "FAILED");
+
+    const esp_err_t storage_init =
+        ecopower_storage_manager_init(sd_ok);
+    if (storage_init != ESP_OK) {
+        ESP_LOGW(
+            MAIN_TAG,
+            "Storage manager init failed: %s",
+            esp_err_to_name(storage_init));
+    }
 
     const esp_err_t wifi_init = ecopower_wifi_manager_init();
     if (wifi_init != ESP_OK) {

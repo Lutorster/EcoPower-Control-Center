@@ -151,7 +151,7 @@ void draw_soc_history(
     lv_draw_rect_dsc_t fill_dsc;
     lv_draw_rect_dsc_init(&fill_dsc);
     fill_dsc.bg_color = lv_color_hex(0x0A6A32);
-    fill_dsc.bg_opa = LV_OPA_40;
+    fill_dsc.bg_opa = LV_OPA_30;
     fill_dsc.border_width = 0;
 
     lv_canvas_draw_polygon(
@@ -160,10 +160,26 @@ void draw_soc_history(
         static_cast<uint32_t>(draw_count + 2U),
         &fill_dsc);
 
+    /* Soft glow under the main SOC line. */
+    lv_draw_line_dsc_t glow_dsc;
+    lv_draw_line_dsc_init(&glow_dsc);
+    glow_dsc.color = lv_color_hex(0x79FF58);
+    glow_dsc.width = 7;
+    glow_dsc.opa = LV_OPA_20;
+    glow_dsc.round_start = 1;
+    glow_dsc.round_end = 1;
+
+    lv_canvas_draw_line(
+        g_canvas,
+        g_line_points,
+        static_cast<uint32_t>(draw_count),
+        &glow_dsc);
+
     lv_draw_line_dsc_t line_dsc;
     lv_draw_line_dsc_init(&line_dsc);
     line_dsc.color = lv_color_hex(0x79FF58);
-    line_dsc.width = 2;
+    line_dsc.width = 3;
+    line_dsc.opa = LV_OPA_COVER;
     line_dsc.round_start = 1;
     line_dsc.round_end = 1;
 
