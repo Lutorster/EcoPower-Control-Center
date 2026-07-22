@@ -39,6 +39,18 @@ esp_err_t ecopower_storage_read(
     size_t capacity,
     size_t *out_size);
 
+/** Create a directory below /sdcard/ecopower if it does not exist. */
+esp_err_t ecopower_storage_ensure_directory(const char *relative_path);
+
+/** Return true when a file or directory exists below /sdcard/ecopower. */
+bool ecopower_storage_exists(const char *relative_path);
+
+/** Append bytes to a file below /sdcard/ecopower and flush them to SD. */
+esp_err_t ecopower_storage_append(
+    const char *relative_path,
+    const void *data,
+    size_t size);
+
 #ifdef __cplusplus
 }
 #endif

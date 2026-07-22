@@ -19,6 +19,7 @@ idf_component_register(
         "ui/widgets/flow_dot.cpp"
         "core/energy_model.cpp"
         "core/daily_energy.cpp"
+        "core/energy_history.cpp"
         "core/storage_manager.cpp"
         "core/inverter_manager.cpp"
         "drivers/sd_card.cpp"

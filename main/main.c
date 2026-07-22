@@ -12,6 +12,7 @@
 #include "core/inverter_manager.h"
 #include "core/daily_energy.h"
 #include "core/storage_manager.h"
+#include "core/energy_history.h"
 #include "esp_log.h"
 
 static const char *MAIN_TAG = "EcoPower";
@@ -76,6 +77,12 @@ void app_main(void)
 
     ESP_ERROR_CHECK(ecopower_inverter_manager_start());
     ESP_ERROR_CHECK(ecopower_daily_energy_init());
+
+    const esp_err_t history_init = ecopower_energy_history_init();
+    if (history_init != ESP_OK) {
+        ESP_LOGW(MAIN_TAG, "Energy history init failed: %s",
+                 esp_err_to_name(history_init));
+    }
 
     if (lvgl_port_lock(-1)) {
         ecopower_ui_start();

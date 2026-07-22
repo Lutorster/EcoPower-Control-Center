@@ -316,3 +316,98 @@ extern "C" esp_err_t ecopower_storage_read(
 
     return ESP_OK;
 }
+
+
+extern "C" esp_err_t ecopower_storage_ensure_directory(
+    const char *relative_path)
+{
+    if (!g_ready) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    char path[kPathCapacity] = {};
+    const esp_err_t path_error = make_full_path(
+        relative_path,
+        path,
+        sizeof(path));
+    if (path_error != ESP_OK) {
+        return path_error;
+    }
+
+    MutexLock lock(g_mutex);
+    if (!lock.locked()) {
+        return ESP_ERR_TIMEOUT;
+    }
+
+    return ensure_directory(path);
+}
+
+extern "C" bool ecopower_storage_exists(const char *relative_path)
+{
+    if (!g_ready) {
+        return false;
+    }
+
+    char path[kPathCapacity] = {};
+    if (make_full_path(relative_path, path, sizeof(path)) != ESP_OK) {
+        return false;
+    }
+
+    MutexLock lock(g_mutex);
+    if (!lock.locked()) {
+        return false;
+    }
+
+    return access(path, F_OK) == 0;
+}
+
+extern "C" esp_err_t ecopower_storage_append(
+    const char *relative_path,
+    const void *data,
+    size_t size)
+{
+    if (!g_ready) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    if (relative_path == nullptr || data == nullptr || size == 0U) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    char path[kPathCapacity] = {};
+    const esp_err_t path_error = make_full_path(
+        relative_path,
+        path,
+        sizeof(path));
+    if (path_error != ESP_OK) {
+        return path_error;
+    }
+
+    MutexLock lock(g_mutex);
+    if (!lock.locked()) {
+        return ESP_ERR_TIMEOUT;
+    }
+
+    FILE *file = std::fopen(path, "ab");
+    if (file == nullptr) {
+        ESP_LOGE(kTag, "Open for append failed: %s", path);
+        return ESP_FAIL;
+    }
+
+    const size_t written = std::fwrite(data, 1U, size, file);
+    bool write_ok = written == size && std::fflush(file) == 0;
+    if (write_ok) {
+        write_ok = fsync(fileno(file)) == 0;
+    }
+
+    if (std::fclose(file) != 0) {
+        write_ok = false;
+    }
+
+    if (!write_ok) {
+        ESP_LOGE(kTag, "Append failed: %s", path);
+        return ESP_FAIL;
+    }
+
+    return ESP_OK;
+}
